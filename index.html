@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hänga gubbe: Svenska bär</title>
+    <!-- Använd Tailwind CSS för styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0c0a09; /* AAA-compliant mörk bakgrund */
+        }
+        .letter-box {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 2rem;
+            height: 2.5rem;
+            background-color: #27272a; /* Mörkgrå för rutor */
+            border-bottom: 2px solid #52525b;
+            color: #fafafa; /* Mycket ljusgrå för AAA-kontrast */
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 0.25rem;
+            border-radius: 0.25rem;
+        }
+        .incorrect-letter-box {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 2rem;
+            height: 2rem;
+            background-color: #be123c; /* Röd färg för felaktiga gissningar */
+            color: #fafafa;
+            font-size: 1.25rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 0.25rem;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Huvudspelbehållare -->
+    <div class="bg-stone-900 text-stone-50 p-6 md:p-10 rounded-xl shadow-lg w-full max-w-2xl text-center border-2 border-stone-800">
+
+        <!-- Speltitel och info -->
+        <h1 class="text-4xl md:text-5xl font-bold text-sky-400 mb-2">Hänga gubbe</h1>
+        <p class="text-lg text-stone-300 mb-4">Jag tänker på ett svenskt bär!</p>
+        <p id="word-length" class="text-xl text-stone-200 mb-6 font-semibold"></p>
+        
+        <!-- Spelstatus och display -->
+        <div class="mb-8 flex flex-col md:flex-row items-center justify-center space-y-8 md:space-y-0 md:space-x-8">
+            <!-- Hänga gubbe figur (visuell indikator för felaktiga gissningar) -->
+            <div id="hangman-figure" class="text-stone-50 font-mono text-xl md:text-2xl min-h-[10rem] md:w-1/2">
+                <!-- Delar läggs till av JavaScript -->
+            </div>
+            
+            <!-- Display för felaktiga gissningar -->
+            <div class="w-full md:w-1/2 flex flex-col items-center">
+                <h3 class="text-lg font-bold text-sky-400 mb-2">Felaktiga bokstäver</h3>
+                <div id="incorrect-letters-display" class="flex flex-wrap justify-center">
+                    <!-- Felaktiga bokstäver läggs till här -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Orddisplay (platshållare och gissade bokstäver) -->
+        <div id="word-display" class="flex justify-center flex-wrap mb-8">
+            <!-- Bokstäver och understreck läggs till av JavaScript -->
+        </div>
+
+        <!-- Gissningsinmatning och knappar -->
+        <div id="game-controls" class="space-y-4">
+            <p id="message" class="text-lg font-semibold text-stone-300 min-h-[2rem]"></p>
+            <input 
+                type="text" 
+                id="guess-input" 
+                maxlength="20"
+                class="w-full p-3 rounded-lg bg-stone-800 text-stone-50 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors text-center"
+                placeholder="Gissa en bokstav eller hela ordet"
+            >
+            <div class="flex flex-col md:flex-row gap-4">
+                <button 
+                    id="submit-button" 
+                    class="w-full md:w-1/2 p-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Gissa
+                </button>
+                <button 
+                    id="new-game-button" 
+                    class="w-full md:w-1/2 p-3 bg-stone-700 hover:bg-stone-600 text-white font-semibold rounded-lg shadow-md transition-colors duration-200"
+                >
+                    Nytt spel
+                </button>
+            </div>
+            <p id="guesses-left" class="text-sm text-stone-500 mt-2"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- Spelvariabler ---
+        const berries = ["hallon", "björnbär", "blåbär", "jordgubbar", "vinbär", "hjortron", "körsbär", "lingon", "havtorn", "enbär", "kråkbär", "olvon", "rönnbär", "nypon", "smultron", "stenbär"];
+        let chosen;
+        let displayWord;
+        let incorrectGuesses;
+        const maxTries = 6;
+        const guessedLetters = new Set();
+        const incorrectGuessedLetters = [];
+
+        // --- DOM-element ---
+        const wordDisplay = document.getElementById('word-display');
+        const guessInput = document.getElementById('guess-input');
+        const submitButton = document.getElementById('submit-button');
+        const newGameButton = document.getElementById('new-game-button');
+        const messageDisplay = document.getElementById('message');
+        const guessesLeftDisplay = document.getElementById('guesses-left');
+        const hangmanFigure = document.getElementById('hangman-figure');
+        const incorrectLettersDisplay = document.getElementById('incorrect-letters-display');
+        const wordLengthDisplay = document.getElementById('word-length');
+
+        /**
+         * Initialiserar eller återställer spelstatus.
+         */
+        function startGame() {
+            chosen = berries[Math.floor(Math.random() * berries.length)];
+            displayWord = Array(chosen.length).fill('_');
+            incorrectGuesses = 0;
+            guessedLetters.clear();
+            incorrectGuessedLetters.length = 0;
+            
+            // Återställ gränssnittet
+            guessInput.value = '';
+            guessInput.disabled = false;
+            submitButton.disabled = false;
+            messageDisplay.textContent = '';
+            
+            updateWordLength();
+            updateWordDisplay();
+            updateHangmanFigure();
+            updateGuessesLeft();
+            updateIncorrectLetters();
+        }
+
+        /**
+         * Uppdaterar displayen för ordlängden.
+         */
+        function updateWordLength() {
+            wordLengthDisplay.textContent = `Ordet har ${chosen.length} bokstäver.`;
+        }
+        
+        /**
+         * Renderar ordets nuvarande status (platshållare och gissade bokstäver).
+         */
+        function updateWordDisplay() {
+            wordDisplay.innerHTML = '';
+            displayWord.forEach(letter => {
+                const box = document.createElement('div');
+                box.classList.add('letter-box');
+                box.textContent = letter;
+                wordDisplay.appendChild(box);
+            });
+        }
+        
+        /**
+         * Uppdaterar displayen för antal gissningar kvar.
+         */
+        function updateGuessesLeft() {
+            guessesLeftDisplay.textContent = `Felaktiga gissningar kvar: ${maxTries - incorrectGuesses}`;
+        }
+        
+        /**
+         * Uppdaterar hänga gubbe-figuren baserat på antalet felaktiga gissningar.
+         */
+        function updateHangmanFigure() {
+            const parts = [
+                '  +---+\n  |   |\n      |\n      |\n      |\n      |\n=========', // 0 fel
+                '  +---+\n  |   |\n  O   |\n      |\n      |\n      |\n=========', // 1 fel
+                '  +---+\n  |   |\n  O   |\n  |   |\n      |\n      |\n=========', // 2 fel
+                '  +---+\n  |   |\n  O   |\n /|   |\n      |\n      |\n=========', // 3 fel
+                '  +---+\n  |   |\n  O   |\n /|\\  |\n      |\n      |\n=========', // 4 fel
+                '  +---+\n  |   |\n  O   |\n /    |\n      |\n      |\n=========', // 5 fel
+                '  +---+\n  |   |\n  O   |\n /|\\  |\n / \\  |\n      |\n========='  // 6 fel
+            ];
+            hangmanFigure.textContent = parts[incorrectGuesses];
+            hangmanFigure.classList.add('whitespace-pre'); // Behåll blanksteg för ASCII-konst
+        }
+
+        /**
+         * Uppdaterar displayen för felaktigt gissade bokstäver.
+         */
+        function updateIncorrectLetters() {
+            incorrectLettersDisplay.innerHTML = '';
+            incorrectGuessedLetters.forEach(letter => {
+                const box = document.createElement('div');
+                box.classList.add('incorrect-letter-box');
+                box.textContent = letter;
+                incorrectLettersDisplay.appendChild(box);
+            });
+        }
+
+        /**
+         * Kontrollerar spelarens gissning mot det hemliga ordet.
+         */
+        function checkGuess() {
+            const guess = guessInput.value.toLowerCase().trim();
+            guessInput.value = '';
+
+            // Hantera tom gissning
+            if (guess === '') {
+                messageDisplay.textContent = "Vänligen ange en bokstav eller ett ord!";
+                return;
+            }
+
+            // Hantera gissning av hela ordet
+            if (guess.length > 1) {
+                if (guess === chosen) {
+                    messageDisplay.textContent = `Wow! Det var en fantastisk gissning! Ordet var ${chosen}. Du vann!`;
+                    endGame(true);
+                } else {
+                    messageDisplay.textContent = `Ledsen, "${guess}" är inte ordet. Försök igen.`;
+                    incorrectGuesses++;
+                    updateGuessesLeft();
+                    updateIncorrectLetters();
+                }
+            } 
+            // Hantera gissning av en enda bokstav
+            else {
+                if (guessedLetters.has(guess)) {
+                    messageDisplay.textContent = `Du har redan gissat "${guess}". Försök med en annan bokstav.`;
+                    return;
+                }
+                guessedLetters.add(guess);
+
+                if (chosen.includes(guess)) {
+                    messageDisplay.textContent = `"${guess}" finns i ordet!`;
+                    // Uppdatera displayordet med den korrekta bokstaven
+                    for (let i = 0; i < chosen.length; i++) {
+                        if (chosen[i] === guess) {
+                            displayWord[i] = guess;
+                        }
+                    }
+                } else {
+                    messageDisplay.textContent = `Ledsen, "${guess}" finns inte i ordet.`;
+                    incorrectGuesses++;
+                    incorrectGuessedLetters.push(guess);
+                    updateGuessesLeft();
+                    updateIncorrectLetters();
+                }
+            }
+            
+            // Kontrollera om spelet är över efter varje gissning
+            updateWordDisplay();
+            updateHangmanFigure();
+            
+            if (!displayWord.includes('_')) {
+                messageDisplay.textContent = `Bra jobbat! Ordet var ${chosen}. Du vann!`;
+                endGame(true);
+            } else if (incorrectGuesses >= maxTries) {
+                messageDisplay.textContent = `Spelet är slut! Det rätta ordet var ${chosen}.`;
+                endGame(false);
+            }
+        }
+        
+        /**
+         * Inaktiverar inmatning och knapp när spelet slutar.
+         * @param {boolean} didWin - Sant om spelaren vann, falskt om de förlorade.
+         */
+        function endGame(didWin) {
+            guessInput.disabled = true;
+            submitButton.disabled = true;
+            if (didWin) {
+                wordDisplay.childNodes.forEach(node => node.style.backgroundColor = '#10B981');
+            } else {
+                wordDisplay.childNodes.forEach(node => node.style.backgroundColor = '#EF4444');
+                for (let i = 0; i < chosen.length; i++) {
+                    displayWord[i] = chosen[i];
+                }
+                updateWordDisplay();
+            }
+        }
+
+        // --- Händelselyssnare ---
+        submitButton.addEventListener('click', checkGuess);
+        newGameButton.addEventListener('click', startGame);
+        
+        guessInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                checkGuess();
+            }
+        });
+
+        window.onload = startGame;
+    </script>
+</body>
+</html>
